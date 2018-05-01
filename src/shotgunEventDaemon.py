@@ -585,8 +585,8 @@ class Engine(object):
                     except OSError, err:
                         self.log.error('Can not write event id data to %s.\n\n%s', eventIdFile, traceback.format_exc(err))
                     break
-                else:
-                    self.log.warning('No state was found. Not saving to disk.')
+            else:
+                self.log.warning('No state was found. Not saving to disk.')
 
     def _checkConnectionAttempts(self, conn_attempts, msg):
         conn_attempts += 1
