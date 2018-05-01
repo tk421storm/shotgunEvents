@@ -46,13 +46,18 @@ except ImportError:
     import pickle
 
 if sys.platform == 'win32':
-    import win32serviceutil
-    import win32service
-    import win32event
-    import servicemanager
+    import win32serviceutil #@UnresolvedImport
+    import win32service #@UnresolvedImport
+    import win32event #@UnresolvedImport
+    import servicemanager #@UnresolvedImport
 
-import daemonizer
-import shotgun_api3 as sg
+import daemonizer #@UnresolvedImport
+import shotgun_api3 as sg #@UnresolvedImport
+
+currentSrc=os.path.dirname(os.path.realpath(__file__))
+currentRoot=os.path.dirname(currentSrc)
+
+defaultPluginDirectory=os.path.join(currentRoot, "plugins")
 
 
 CURRENT_PYTHON_VERSION = StrictVersion(sys.version.split()[0])
@@ -158,10 +163,26 @@ class Config(ConfigParser.ConfigParser):
         return self.get('daemon', 'pidFile')
 
     def getPluginPaths(self):
-        return [s.strip() for s in self.get('plugins', 'paths').split(',')]
+        base=[s.strip() for s in self.get('plugins', 'paths').split(',')]
+        
+        final=[]
+        for entry in base:
+            if entry:
+                final.append(entry)
+                sys.path.append(entry)
+        
+        #append default path as well
+        final.append(defaultPluginDirectory)
+        
+        return final
 
     def getSMTPServer(self):
-        return self.get('emails', 'server')
+        if self.has_option('emails', 'server'):
+            server=self.get('emails', 'server')
+        else:
+            server=None
+
+        return server
 
     def getSMTPPort(self):
         if self.has_option('emails', 'port'):
@@ -259,17 +280,19 @@ class Engine(object):
             rootLogger = logging.getLogger()
             rootLogger.config = self.config
             _setFilePathOnLogger(rootLogger, self.config.getLogFile())
-            print self.config.getLogFile()
+            #print self.config.getLogFile()
 
             # Set the engine logger for email output.
             self.log = logging.getLogger('engine')
-            self.setEmailsOnLogger(self.log, True)
+            if self.config.getSMTPServer():
+                self.setEmailsOnLogger(self.log, True)
         else:
             # Set the engine logger for file and email output.
             self.log = logging.getLogger('engine')
             self.log.config = self.config
             _setFilePathOnLogger(self.log, self.config.getLogFile())
-            self.setEmailsOnLogger(self.log, True)
+            if self.config.getSMTPServer():
+                self.setEmailsOnLogger(self.log, True)
 
         self.log.setLevel(self.config.getLogLevel())
 
@@ -283,27 +306,30 @@ class Engine(object):
             return
 
         smtpServer = self.config.getSMTPServer()
-        smtpPort = self.config.getSMTPPort()
-        fromAddr = self.config.getFromAddr()
-        emailSubject = self.config.getEmailSubject()
-        username = self.config.getEmailUsername()
-        password = self.config.getEmailPassword()
-        if self.config.getSecureSMTP():
-            secure = (None, None)
-        else:
-            secure = None
+        if smtpServer:
+            smtpPort = self.config.getSMTPPort()
+            fromAddr = self.config.getFromAddr()
+            emailSubject = self.config.getEmailSubject()
+            username = self.config.getEmailUsername()
+            password = self.config.getEmailPassword()
+            if self.config.getSecureSMTP():
+                secure = (None, None)
+            else:
+                secure = None
 
-        if emails is True:
-            toAddrs = self.config.getToAddrs()
-        elif isinstance(emails, (list, tuple)):
-            toAddrs = emails
-        else:
-            msg = 'Argument emails should be True to use the default addresses, False to not send any emails or a list of recipient addresses. Got %s.'
-            raise ValueError(msg % type(emails))
+            if emails is True:
+                toAddrs = self.config.getToAddrs()
+            elif isinstance(emails, (list, tuple)):
+                toAddrs = emails
+            else:
+                msg = 'Argument emails should be True to use the default addresses, False to not send any emails or a list of recipient addresses. Got %s.'
+                raise ValueError(msg % type(emails))
 
-        _addMailHandlerToLogger(
-            logger, (smtpServer, smtpPort), fromAddr, toAddrs, emailSubject, username, password, secure
-        )
+            _addMailHandlerToLogger(
+	            logger, (smtpServer, smtpPort), fromAddr, toAddrs, emailSubject, username, password, secure
+	        )
+        else:
+            return
 
     def start(self):
         """
@@ -321,8 +347,12 @@ class Engine(object):
         try:
             for collection in self._pluginCollections:
                 collection.load()
+                
+            print "loaded plugins (if any)"
 
             self._loadEventIdData()
+            
+            print "loaded stored event (if any)"
 
             self._mainLoop()
         except KeyboardInterrupt:
@@ -341,6 +371,8 @@ class Engine(object):
         processing from there.
         """
         eventIdFile = self.config.getEventIdFile()
+        
+        #print eventIdFile
 
         if eventIdFile and os.path.exists(eventIdFile):
             try:
@@ -399,6 +431,15 @@ class Engine(object):
                         self.log.debug('Read last event id (%d) from file.', lastEventId)
                         for collection in self._pluginCollections:
                             collection.setState(lastEventId)
+                except EOFError:
+                    #pickle file is corrupt
+                    lastEventId = self._getLastEventIdFromDatabase()
+                    if lastEventId:
+                        for collection in self._pluginCollections:
+                            collection.setState(lastEventId)
+
+                    self._saveEventIdData()
+
                 fh.close()
             except OSError, err:
                 raise EventDaemonError('Could not load event id from file.\n\n%s' % traceback.format_exc(err))
@@ -454,9 +495,12 @@ class Engine(object):
         - Each time through the loop, if the pidFile is gone, stop.
         """
         self.log.debug('Starting the event processing loop.')
+        print "loop started"
         while self._continue:
             # Process events
+            print "looping"
             events = self._getNewEvents()
+            print events
             for event in events:
                 for collection in self._pluginCollections:
                     collection.process(event)
@@ -523,6 +567,8 @@ class Engine(object):
         if eventIdFile is not None:
             for collection in self._pluginCollections:
                 self._eventIdData[collection.path] = collection.getState()
+                
+            print self._eventIdData.items()
 
             for colPath, state in self._eventIdData.items():
                 if state:
@@ -533,8 +579,8 @@ class Engine(object):
                     except OSError, err:
                         self.log.error('Can not write event id data to %s.\n\n%s', eventIdFile, traceback.format_exc(err))
                     break
-            else:
-                self.log.warning('No state was found. Not saving to disk.')
+                else:
+                    self.log.warning('No state was found. Not saving to disk.')
 
     def _checkConnectionAttempts(self, conn_attempts, msg):
         conn_attempts += 1
@@ -608,13 +654,17 @@ class PluginCollection(object):
         newPlugins = {}
 
         for basename in os.listdir(self.path):
+        
+            fullpath=os.path.join(self.path, basename)
+ 
             if not basename.endswith('.py') or basename.startswith('.'):
-                continue
+                if not os.path.isdir(fullpath):
+                    continue
 
             if basename in self._plugins:
                 newPlugins[basename] = self._plugins[basename]
             else:
-                newPlugins[basename] = Plugin(self._engine, os.path.join(self.path, basename))
+                newPlugins[basename] = Plugin(self._engine, fullpath)
 
             newPlugins[basename].load()
 
@@ -643,7 +693,13 @@ class Plugin(object):
         self._path = path
 
         if not os.path.isfile(path):
-            raise ValueError('The path to the plugin is not a valid file - %s.' % path)
+            #look for a __init__ in the directory, if there, redirect to it
+            if os.path.exists(os.path.join(path, '__init__.py')):
+                print "found folder-based plugin"
+                self._path=os.path.join(path, '__init__.py')
+                sys.path.append(path)
+            else:
+                raise ValueError('The path to the plugin is not a valid file - %s.' % path)
 
         self._pluginName = os.path.splitext(os.path.split(self._path)[1])[0]
         self._active = True
@@ -1146,16 +1202,16 @@ class LinuxDaemon(daemonizer.Daemon):
         self._engine.stop()
 
 
-def main():
+def main(action=None):
     """
     """
-    action = None
-    if len(sys.argv) > 1:
-        action = sys.argv[1]
+    if not action:
+        if len(sys.argv) > 1:
+            action = sys.argv[1]
 
-    if sys.platform == 'win32' and action != 'foreground':
-        win32serviceutil.HandleCommandLine(WindowsService)
-        return 0
+        if sys.platform == 'win32' and action != 'foreground':
+            win32serviceutil.HandleCommandLine(WindowsService)
+            return 0
 
     if action:
         daemon = LinuxDaemon()
