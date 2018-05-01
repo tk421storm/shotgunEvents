@@ -379,6 +379,9 @@ class Engine(object):
                 fh = open(eventIdFile)
                 try:
                     self._eventIdData = pickle.load(fh)
+                    
+                    print "self._eventIdData:"
+                    print self._eventIdData
 
                     # Provide event id info to the plugin collections. Once
                     # they've figured out what to do with it, ask them for their
@@ -416,6 +419,8 @@ class Engine(object):
                                 else:
                                     state[pluginName] = lastEventId
                             collection.setState(state)
+                            
+                    
 
                 except pickle.UnpicklingError:
                     fh.close()
@@ -444,6 +449,7 @@ class Engine(object):
             except OSError, err:
                 raise EventDaemonError('Could not load event id from file.\n\n%s' % traceback.format_exc(err))
         else:
+            print "no id file"
             # No id file?
             # Get the event data from the database.
             lastEventId = self._getLastEventIdFromDatabase()
@@ -607,14 +613,18 @@ class PluginCollection(object):
         self._stateData = {}
 
     def setState(self, state):
+        print self.path+" state: "+str(state)
         if isinstance(state, int):
             for plugin in self:
+                print "plugin: "+str(plugin)
                 plugin.setState(state)
                 self._stateData[plugin.getName()] = plugin.getState()
         else:
             self._stateData = state
             for plugin in self:
+                print "plugin: "+str(plugin.getName())
                 pluginState = self._stateData.get(plugin.getName())
+                print "plugin state: "+str(pluginState)
                 if pluginState:
                     plugin.setState(pluginState)
 
@@ -720,12 +730,16 @@ class Plugin(object):
         return self._pluginName
 
     def setState(self, state):
+        print self._pluginName+" state: "+str(state)
+        
         if isinstance(state, int):
             self._lastEventId = state
         elif isinstance(state, tuple):
             self._lastEventId, self._backlog = state
         else:
             raise ValueError('Unknown state type: %s.' % type(state))
+           
+        print self._pluginName+" set to "+str(state)
 
     def getState(self):
         return (self._lastEventId, self._backlog)
