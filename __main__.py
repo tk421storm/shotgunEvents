@@ -1,4 +1,4 @@
 
-from src.shotgunEventDaemon import main
+from src.shotgunEventDaemon import mainForeground
 
-main('foreground')
+mainForeground()
