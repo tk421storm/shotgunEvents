@@ -55,6 +55,8 @@ if sys.platform == 'win32':
 import daemonizer #@UnresolvedImport
 import shotgun_api3 as sg #@UnresolvedImport
 
+from sendmail import sendMail
+
 currentSrc=os.path.dirname(os.path.realpath(__file__))
 currentRoot=os.path.dirname(currentSrc)
 
@@ -718,17 +720,23 @@ class Plugin(object):
 		"""
 		self._engine = engine
 		self._path = path
+		self._folderBased = False
 
 		if not os.path.isfile(path):
 			#look for a __init__ in the directory, if there, redirect to it
 			if os.path.exists(os.path.join(path, '__init__.py')):
 				print "found folder-based plugin"
 				self._path=os.path.join(path, '__init__.py')
-				sys.path.append(path)
+				sys.path.append(os.path.dirname(path))
+				self._folderBased = True
 			else:
 				raise ValueError('The path to the plugin is not a valid file - %s.' % path)
-
-		self._pluginName = os.path.splitext(os.path.split(self._path)[1])[0]
+			
+		if not self._folderBased:
+			self._pluginName = os.path.splitext(os.path.split(self._path)[1])[0]
+		else:
+			self._pluginName = os.path.splitext(os.path.split(os.path.dirname(self._path))[-1])[0]
+			
 		self._active = True
 		self._callbacks = []
 		self._mtime = None
@@ -820,8 +828,10 @@ class Plugin(object):
 		mtime = os.path.getmtime(self._path)
 		if self._mtime is None:
 			self._engine.log.info('Loading plugin at %s' % self._path)
-		elif self._mtime < mtime:
-			self._engine.log.info('Reloading plugin at %s' % self._path)
+			
+		#disable automatic reloading
+		#elif self._mtime < mtime:
+		#	self._engine.log.info('Reloading plugin at %s' % self._path)
 		else:
 			# The mtime of file is equal or older. We don't need to do anything.
 			return
@@ -832,10 +842,18 @@ class Plugin(object):
 		self._active = True
 
 		try:
-			plugin = imp.load_source(self._pluginName, self._path)
+			
+			if not self._folderBased:
+				plugin = imp.load_source(self._pluginName, self._path)
+			else:
+				plugin = __import__(self._pluginName)
 		except:
+			var=traceback.format_exc()
 			self._active = False
-			self.logger.error('Could not load the plugin at %s.\n\n%s', self._path, traceback.format_exc())
+			self.logger.error('Could not load the plugin at %s.\n\n%s', self._path, var)
+			#email
+			sendMail('shotgunEventDaemon - error loading '+self._pluginName, var, [self._engine.config.getLogFile()])
+			
 			return
 
 		regFunc = getattr(plugin, 'registerCallbacks', None)
@@ -866,6 +884,7 @@ class Plugin(object):
 		self._callbacks.append(Callback(callback, self, self._engine, sgConnection, matchEvents, args, stopOnError))
 
 	def process(self, event):
+		print self._pluginName+" processing event "+str(event['id'])
 		if event['id'] in self._backlog:
 			if self._process(event):
 				self.logger.info('Processed id %d from backlog.' % event['id'])
