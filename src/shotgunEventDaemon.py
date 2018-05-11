@@ -721,6 +721,7 @@ class Plugin(object):
 		self._engine = engine
 		self._path = path
 		self._folderBased = False
+		ready=True
 
 		if not os.path.isfile(path):
 			#look for a __init__ in the directory, if there, redirect to it
@@ -730,14 +731,19 @@ class Plugin(object):
 				sys.path.append(os.path.dirname(path))
 				self._folderBased = True
 			else:
-				raise ValueError('The path to the plugin is not a valid file - %s.' % path)
+				#raise ValueError('The path to the plugin is not a valid file - %s.' % path)
+				ready=False
 			
 		if not self._folderBased:
 			self._pluginName = os.path.splitext(os.path.split(self._path)[1])[0]
 		else:
 			self._pluginName = os.path.splitext(os.path.split(os.path.dirname(self._path))[-1])[0]
+		
+		if ready:
+			self._active = True
+		else:
+			self._active = False
 			
-		self._active = True
 		self._callbacks = []
 		self._mtime = None
 		self._lastEventId = None
@@ -861,9 +867,12 @@ class Plugin(object):
 			try:
 				regFunc(Registrar(self))
 			except:
-				self._engine.log.critical('Error running register callback function from plugin at %s.\n\n%s', self._path, traceback.format_exc())
+				var=traceback.format_exc()
+				sendMail('shotgunEventDaemon - Error running register callback function '+self._pluginName, var, [self._engine.config.getLogFile()])
+				self._engine.log.critical('Error running register callback function from plugin at %s.\n\n%s', self._path, var)
 				self._active = False
 		else:
+			sendMail('shotgunEventDaemon - no registerCallbacks function in '+self._pluginName, None, [self._engine.config.getLogFile()])
 			self._engine.log.critical('Did not find a registerCallbacks function in plugin at %s.', self._path)
 			self._active = False
 			

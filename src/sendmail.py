@@ -19,6 +19,9 @@ emailTo='tk421storm@gmail.com'
 def sendMail(subject, message, attachments=None, zipAttachments=True):
 	'''send an email to the archivist list'''
 	
+	if not message:
+		message=""
+		
 	message=message.replace("\n", "<br />")
 	
 	# Create a text/plain message
