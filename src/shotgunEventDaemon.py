@@ -523,7 +523,7 @@ class Engine(object):
 		#print "loop started, killers: "+str(self.killers)
 		while self._continue and not True in [killer.kill_now for killer in self.killers]:
 			# Process events
-			print "looping, killers: "+str(self.killers)
+			#print "looping, killers: "+str(self.killers)
 			events = self._getNewEvents()
 			#print events
 			for event in events:
