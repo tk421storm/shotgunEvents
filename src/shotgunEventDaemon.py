@@ -520,7 +520,7 @@ class Engine(object):
 		- Each time through the loop, if the pidFile is gone, stop.
 		"""
 		self.log.debug('Starting the event processing loop.')
-		print "loop started, killers: "+str(self.killers)
+		#print "loop started, killers: "+str(self.killers)
 		while self._continue and not True in [killer.kill_now for killer in self.killers]:
 			# Process events
 			print "looping, killers: "+str(self.killers)
