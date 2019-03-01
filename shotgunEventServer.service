@@ -1,0 +1,15 @@
+[Unit]
+Description=Shotgun Event Server
+After=network.target
+
+[Service]
+Restart=always
+RestartSec=15
+ExecStart=/usr/bin/python /home/administrator/shotgunEvents/src/shotgunEventServer.py foreground
+StandardOutput=null
+StandardError=null
+User=administrator
+Group=administrator
+
+[Install]
+WantedBy=multi-user.target
