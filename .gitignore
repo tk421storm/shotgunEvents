@@ -1,2 +1,6 @@
 docs/_build/doctrees
 *.pyc
+.project
+.pydevproject
+logs
+lastEvent.id

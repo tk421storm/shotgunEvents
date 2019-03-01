@@ -39,6 +39,13 @@ import time
 import traceback
 import signal
 
+currentSrc=os.path.dirname(os.path.realpath(__file__))
+currentRoot=os.path.dirname(currentSrc)
+
+#append location of shotgun api
+shotgunPath=os.path.join(currentRoot, "shotgun_api3")
+sys.path.append(shotgunPath)
+
 from distutils.version import StrictVersion
 
 try:
@@ -46,19 +53,12 @@ try:
 except ImportError:
 	import pickle
 
-if sys.platform == 'win32':
-	import win32serviceutil #@UnresolvedImport
-	import win32service #@UnresolvedImport
-	import win32event #@UnresolvedImport
-	import servicemanager #@UnresolvedImport
-
 import daemonizer #@UnresolvedImport
 import shotgun_api3 as sg #@UnresolvedImport
 
 from sendmail import sendMail
 
-currentSrc=os.path.dirname(os.path.realpath(__file__))
-currentRoot=os.path.dirname(currentSrc)
+
 
 defaultPluginDirectory=os.path.join(currentRoot, "plugins")
 
@@ -1205,45 +1205,6 @@ class ConfigError(EventDaemonError):
 	pass
 
 
-if sys.platform == 'win32':
-	class WindowsService(win32serviceutil.ServiceFramework):
-		"""
-		Windows service wrapper
-		"""
-		_svc_name_ = "ShotgunEventDaemon"
-		_svc_display_name_ = "Shotgun Event Handler"
-
-		def __init__(self, args):
-			win32serviceutil.ServiceFramework.__init__(self, args)
-			self.hWaitStop = win32event.CreateEvent(None, 0, 0, None)
-			self._engine = Engine(_getConfigPath())
-
-		def SvcStop(self):
-			"""
-			Stop the Windows service.
-			"""
-			self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
-			win32event.SetEvent(self.hWaitStop)
-			self._engine.stop()
-
-		def SvcDoRun(self):
-			"""
-			Start the Windows service.
-			"""
-			servicemanager.LogMsg(
-				servicemanager.EVENTLOG_INFORMATION_TYPE,
-				servicemanager.PYS_SERVICE_STARTED,
-				(self._svc_name_, '')
-			)
-			self.main()
-
-		def main(self):
-			"""
-			Primary Windows entry point
-			"""
-			self._engine.start()
-
-
 class LinuxDaemon(daemonizer.Daemon):
 	"""
 	Linux Daemon wrapper or wrapper used for foreground operation on Windows
@@ -1279,7 +1240,7 @@ def main(action=None):
 			action = sys.argv[1]
 
 		if sys.platform == 'win32' and action != 'foreground':
-			win32serviceutil.HandleCommandLine(WindowsService)
+			print "removed windows service functionality"
 			return 0
 
 	if action:
@@ -1295,7 +1256,7 @@ def main(action=None):
 
 	print "usage: %s start|stop|restart|foreground" % sys.argv[0]
 	return 2
-   
+
 def mainForeground():
 	'''
 	skip all the complicated daemon stuff and just run in the foreground
