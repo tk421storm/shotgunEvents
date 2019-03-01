@@ -1,3 +1,6 @@
 [submodule "shotgun_api3"]
 	path = shotgun_api3
 	url = https://github.com/shotgunsoftware/python-api.git
+[submodule "plugins/phosAutomater"]
+	path = plugins/phosAutomater
+	url = https://git.tks-designs.com/phosphene/eseAutomater.git
