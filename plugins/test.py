@@ -40,8 +40,8 @@ def registerCallbacks(reg):
     # eventFilter = {'Shotgun_Task_Change': ['sg_status_list']}
     eventFilter = None
     reg.registerCallback(
-        "eseParse",
-        "d042a2bca6946e973a54baaa9e6350c09d49952c3cded74aa7bc50173aa2e2de",
+        "status_automater",
+        "g5yazdhpcel%mrsrzvowedXav",
         logArgs,
         eventFilter,
         None,
