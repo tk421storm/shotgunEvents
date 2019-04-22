@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Restart=always
 RestartSec=15
-ExecStart=/usr/bin/python /home/administrator/shotgunEvents/src/shotgunEventServer.py foreground
+ExecStart=/usr/bin/python /home/administrator/shotgunEvents/src/shotgunEventDaemon.py foreground
 StandardOutput=null
 StandardError=null
 User=administrator
