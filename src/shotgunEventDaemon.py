@@ -15,7 +15,6 @@
 # Short-Description: Shotgun event daemon
 # Description: Shotgun event daemon
 ### END INIT INFO
-from pip.__main__ import path
 
 """
 For an overview of shotgunEvents, please see raw documentation in the docs
