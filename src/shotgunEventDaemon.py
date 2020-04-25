@@ -15,6 +15,7 @@
 # Short-Description: Shotgun event daemon
 # Description: Shotgun event daemon
 ### END INIT INFO
+from pip.__main__ import path
 
 """
 For an overview of shotgunEvents, please see raw documentation in the docs
@@ -160,10 +161,20 @@ class Config(ConfigParser.ConfigParser):
 			return None
 
 	def getEventIdFile(self):
-		return self.get('daemon', 'eventIdFile')
+		#check for relative path
+		path=self.get('daemon', 'eventIdFile')
+		if os.path.isabs(path):
+			return path
+		else:
+			return os.path.join(currentRoot, path)
+			
 
 	def getEnginePIDFile(self):
-		return self.get('daemon', 'pidFile')
+		path=self.get('daemon', 'pidFile')
+		if os.path.isabs(path):
+			return path
+		else:
+			return os.path.join(currentRoot, path)
 
 	def getPluginPaths(self):
 		base=[s.strip() for s in self.get('plugins', 'paths').split(',')]
@@ -236,6 +247,9 @@ class Config(ConfigParser.ConfigParser):
 
 		if self.has_option('daemon', 'logPath'):
 			path = self.get('daemon', 'logPath')
+			
+			if  not os.path.isabs(path):
+				path=os.path.join(currentRoot, path)
 
 			if not os.path.exists(path):
 				os.makedirs(path)
